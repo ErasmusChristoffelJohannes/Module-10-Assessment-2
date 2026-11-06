@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>API Key</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@600;700;800&display=swap" rel="stylesheet">
+        <link href="styles.css" rel="stylesheet">
+    </head>
+    <body class="cover-page">
+        <main class="cover">
+            <div class="cover-plate">
+                <h1>Contact<br/>Book</h1>
+            </div>
+
+            <form class="cover-form">
+                <label class="form-label" for="apiKey">Enter your API key to open your contacts</label>
+                <input type="email" class="form-control" id="apiKey" name="apiKey" required/>
+                <p class="form-error" id="keyError" role="alert" hidden></p>
+                <button id="submitApiKey" class="btn btn-tab w-100 mt-3">Open contact book</button>
+            </form>
+        </main>
+
+        <script>
+            let rootPath = "https://mysite.itvarsity.org/api/ContactBook/";
+            document.getElementById("submitApiKey").addEventListener('click', setApiKey);
+
+            function setApiKey(e){
+                e.preventDefault();
+
+                apiKey = document.getElementById("apiKey").value;
+                fetch(rootPath + "controller/api-key/?apiKey=" + encodeURIComponent(apiKey))
+                        .then(function (response) {
+                            return response.text();
+                        })
+                        .then(function (data) {
+
+                            if (data == "1") {
+                                localStorage.setItem("apiKey", apiKey);
+                                window.open("index.html", "_self");
+                            } else {
+                                showKeyError("That API key isn't valid. Check it and try again.");
+                            }
+                        })
+                        .catch(function () {
+                            showKeyError("The API key couldn't be checked. Check your internet connection, then try again.");
+                        });
+            }
+
+            function showKeyError(message){
+                var error = document.getElementById("keyError");
+                error.textContent = message;
+                error.hidden = false;
+            }
+        </script>
+    </body>
+</html>

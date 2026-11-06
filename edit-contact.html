@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Contact</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@600;700;800&display=swap" rel="stylesheet">
+        <link href="styles.css" rel="stylesheet">
+    </head>
+    <body onload="getContact()">
+        <div class="book">
+            <main class="page page-plain">
+                <a class="back-link" id="homeLink" href="index.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> All contacts</a>
+
+                <div class="card-head">
+                    <div id="avatarImage" data-size="avatar-large"></div>
+                    <div class="card-head-text">
+                        <h1 class="card-name" id="cardName">&nbsp;</h1>
+                        <div class="d-flex flex-wrap gap-2" id="contactActions"></div>
+                    </div>
+                </div>
+
+                <form id="editForm" class="fields">
+                    <div class="field">
+                        <label for="firstname">First name</label>
+                        <input type="text" class="form-control" name="firstname" id="firstname" required readonly/>
+                    </div>
+                    <div class="field">
+                        <label for="lastname">Last name</label>
+                        <input type="text" class="form-control" name="lastname" id="lastname" readonly/>
+                    </div>
+                    <div class="field">
+                        <label for="mobile">Mobile</label>
+                        <input type="tel" class="form-control" name="mobile" id="mobile" readonly/>
+                    </div>
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input type="email" class="form-control" name="email" id="email" readonly/>
+                    </div>
+                    <div class="field" id="avatarField" hidden>
+                        <label for="avatar" id="avatarLabel">Photo</label>
+                        <input type="file" class="form-control" name="avatar" id="avatar" accept="image/*"/>
+                    </div>
+                    <p class="form-error" id="formError" role="alert" hidden></p>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-tab" id="SubmitForm" hidden>Save changes</button>
+                        <button type="button" class="btn btn-line" id="cancelEdit" hidden>Cancel</button>
+                        <button type="button" class="btn btn-tab" id="editContact"><i class="bi bi-pencil-fill" aria-hidden="true"></i> Edit</button>
+                        <button type="button" class="btn btn-delete" id="deleteContact"><i class="bi bi-trash3-fill" aria-hidden="true"></i> Delete</button>
+                    </div>
+                </form>
+            </main>
+        </div>
+
+        <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body p-4">
+                        <h2 class="modal-title fs-3" id="deleteTitle">Delete this contact?</h2>
+                        <p class="mt-2 mb-4">This removes them from your contact book for good.</p>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-line" data-bs-dismiss="modal">Keep contact</button>
+                            <button type="button" class="btn btn-delete-solid" id="confirmDelete">Delete contact</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="./config.js"></script>
+        <script src="./ui.js"></script>
+        <script>
+            var id = getId();
+            var deleteModal = new bootstrap.Modal(document.getElementById("deleteModal"));
+            var editableFields = ["firstname", "lastname", "mobile", "email"];
+
+            document.getElementById("editContact").addEventListener('click', editContact);
+            document.getElementById("cancelEdit").addEventListener('click', cancelEdit);
+            document.getElementById("SubmitForm").addEventListener('click', submitForm);
+            document.getElementById("deleteContact").addEventListener('click', function(){
+                deleteModal.show();
+            });
+            document.getElementById("confirmDelete").addEventListener('click', deleteContact);
+            document.getElementById("avatar").addEventListener('change', function(){
+                previewAvatar(this, "avatarImage");
+            });
+
+            function getId(){
+                var url= window.location.href;
+                var pos = url.search("=");
+                var id = url.slice(pos + 1);
+                return id;
+            }
+
+            function getContact(){
+                fetch(rootPath + 'controller/get-contacts/?id=' + id)
+                .then(function(response){
+                    return response.json();
+                })
+                .then(function(data){
+                    displayOutput(data);
+                })
+                .catch(function(){
+                    showError("This contact didn't load. Check your internet connection, then refresh the page.");
+                });
+            }
+
+            function homeLink(){
+                window.open("index.html", "_self");
+            }
+
+            function displayOutput(data){
+                var contact = data[0];
+                var name = ((contact.firstname || "") + " " + (contact.lastname || "")).trim();
+
+                document.title = name || "Contact";
+                document.getElementById("avatarImage").innerHTML = avatarHtml(contact, "avatar-large");
+                document.getElementById("cardName").textContent = name || "Unnamed contact";
+                document.getElementById("firstname").value = contact.firstname;
+                document.getElementById("lastname").value = contact.lastname;
+                document.getElementById("mobile").value = contact.mobile;
+                document.getElementById("email").value = contact.email;
+
+                var actions = "";
+                if(contact.mobile){
+                    actions += `<a class="btn btn-line" href="tel:${encodeURIComponent(contact.mobile)}"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Call</a>`;
+                }
+                if(contact.email){
+                    actions += `<a class="btn btn-line" href="mailto:${encodeURIComponent(contact.email)}"><i class="bi bi-envelope-fill" aria-hidden="true"></i> Email</a>`;
+                }
+                document.getElementById("contactActions").innerHTML = actions;
+            }
+
+            function setEditing(editing){
+                editableFields.forEach(function(field){
+                    document.getElementById(field).readOnly = !editing;
+                });
+                document.getElementById("avatarField").hidden = !editing;
+                document.getElementById("SubmitForm").hidden = !editing;
+                document.getElementById("cancelEdit").hidden = !editing;
+                document.getElementById("editContact").hidden = editing;
+                document.getElementById("deleteContact").hidden = editing;
+                document.getElementById("contactActions").hidden = editing;
+                document.getElementById("formError").hidden = true;
+            }
+
+            function editContact(){
+                setEditing(true);
+                document.getElementById("firstname").focus();
+            }
+
+            function cancelEdit(){
+                setEditing(false);
+                document.getElementById("avatar").value = "";
+                getContact();
+            }
+
+            function submitForm(e){
+                e.preventDefault();
+
+                const formElement = document.querySelector('#editForm');
+                if(!formElement.reportValidity()){
+                    return;
+                }
+
+                const form = new FormData(formElement);
+                form.append('apiKey', apiKey);
+                form.append('id', id);
+
+                fetch(rootPath + 'controller/edit-contact/', {
+                    method: 'POST',
+                    headers: {'Accept': 'application/json, *.*'},
+                    body: form
+                })
+                .then(function(response){
+                    return response.text();
+                })
+                .then(function(data){
+                    if(data == "1"){
+                        setFlash("Changes saved.");
+                        homeLink();
+                    }else{
+                        showError(data);
+                    }
+                })
+                .catch(function(){
+                    showError("The changes weren't saved. Check your internet connection, then try again.");
+                });
+            }
+
+            function deleteContact(){
+                fetch(rootPath + 'controller/delete-contact/?id=' + id)
+                .then(function(response){
+                    return response.text();
+                })
+                .then(function(data){
+                    deleteModal.hide();
+                    if(data == "1"){
+                        setFlash("Contact deleted.");
+                        homeLink();
+                    }else{
+                        showToast(data, true);
+                    }
+                })
+                .catch(function(){
+                    deleteModal.hide();
+                    showToast("The contact wasn't deleted. Check your internet connection, then try again.", true);
+                });
+            }
+
+            function showError(message){
+                var error = document.getElementById("formError");
+                error.textContent = message;
+                error.hidden = false;
+            }
+        </script>
+    </body>
+</html>

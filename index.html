@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Contact Book</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@600;700;800&display=swap" rel="stylesheet">
+	<link href="styles.css" rel="stylesheet">
+</head>
+<body onload="fetchContacts()">
+
+    <div class="book">
+        <main class="page">
+            <h1 class="page-title">Contacts</h1>
+            <p class="contact-count" id="count">&nbsp;</p>
+
+            <div class="toolbar">
+                <div class="search">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" class="form-control" id="search" placeholder="Search names, numbers and emails" aria-label="Search contacts"/>
+                </div>
+                <button id="refresh" class="btn btn-line" type="button" aria-label="Refresh contacts" title="Refresh"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+                <button id="addContact" class="btn btn-tab" type="button"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add contact</button>
+            </div>
+
+            <div id="table">
+                <div class="notice">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3">Loading contacts...</p>
+                </div>
+            </div>
+        </main>
+        <nav class="tabs" id="tabs" aria-label="Jump to letter"></nav>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="./config.js"></script>
+    <script src="./ui.js"></script>
+    <script>
+        var contacts = [];
+        var tabsShown = false;
+        var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
+
+        document.getElementById("refresh").addEventListener('click', fetchContacts);
+        document.getElementById("addContact").addEventListener('click', addContact);
+        document.getElementById("search").addEventListener('input', displayOutput);
+
+        function fetchContacts(){
+            var refresh = document.getElementById("refresh");
+            refresh.classList.add("spinning");
+
+            fetch(rootPath + "controller/get-contacts/")
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data){
+                contacts = Array.isArray(data) ? data : [];
+                contacts.sort(function(a, b){
+                    return fullName(a).localeCompare(fullName(b));
+                });
+                displayOutput();
+                showFlash();
+            })
+            .catch(function(){
+                document.getElementById("count").innerHTML = "&nbsp;";
+                document.getElementById("table").innerHTML = `
+                    <div class="notice">
+                        <h2>Contacts didn't load</h2>
+                        <p>Check your internet connection, then try again.</p>
+                        <button class="btn btn-tab" type="button" onclick="fetchContacts()">Try again</button>
+                    </div>
+                `;
+            })
+            .finally(function(){
+                refresh.classList.remove("spinning");
+            });
+        }
+
+        function fullName(contact){
+            return ((contact.firstname || "") + " " + (contact.lastname || "")).trim();
+        }
+
+        function letterFor(contact){
+            var letter = fullName(contact).charAt(0).normalize("NFD").charAt(0).toUpperCase();
+            return letter >= "A" && letter <= "Z" ? letter : "#";
+        }
+
+        function displayOutput(){
+            var term = document.getElementById("search").value.trim().toLowerCase();
+            var matches = contacts.filter(function(contact){
+                var text = fullName(contact) + " " + (contact.mobile || "") + " " + (contact.email || "");
+                return text.toLowerCase().includes(term);
+            });
+
+            var groups = {};
+            for (a in matches){
+                var letter = letterFor(matches[a]);
+                groups[letter] = groups[letter] || [];
+                groups[letter].push(matches[a]);
+            }
+
+            document.getElementById("count").textContent = term
+                ? matches.length + " of " + contacts.length + " contacts"
+                : contacts.length + (contacts.length == 1 ? " contact" : " contacts");
+
+            displayTabs(groups);
+
+            if(matches.length == 0){
+                document.getElementById("table").innerHTML = term
+                    ? `<div class="notice">
+                            <h2>No matches</h2>
+                            <p>Nobody in your contacts matches "${escapeHtml(term)}".</p>
+                       </div>`
+                    : `<div class="notice">
+                            <h2>Your contact book is empty</h2>
+                            <p>Add your first contact to start filling it in.</p>
+                            <button class="btn btn-tab" type="button" onclick="addContact()">Add contact</button>
+                       </div>`;
+                return;
+            }
+
+            var output = "";
+            letters.forEach(function(letter){
+                if(groups[letter]){
+                    output += `<section class="letter-group" id="letter-${letter == "#" ? "other" : letter}">
+                        <h2 class="letter">${letter}</h2>
+                        <div>${groups[letter].map(contactRow).join("")}</div>
+                    </section>`;
+                }
+            });
+            document.getElementById("table").innerHTML = output;
+        }
+
+        function contactRow(contact){
+            var mobile = escapeHtml(contact.mobile);
+            var email = escapeHtml(contact.email);
+            var meta = "";
+            if(contact.mobile){
+                meta = mobile;
+            }else if(contact.email){
+                meta = email;
+            }
+            return `
+                <div class="contact-row">
+                    ${avatarHtml(contact)}
+                    <div class="contact-info">
+                        <a class="contact-name stretched-link" href="edit-contact.html?id=${encodeURIComponent(contact.id)}">${escapeHtml(fullName(contact)) || "Unnamed contact"}</a>
+                        <span class="contact-meta">${meta}</span>
+                    </div>
+                    <div class="quick-actions">
+                        ${contact.mobile ? `<a class="quick-action" href="tel:${encodeURIComponent(contact.mobile)}" aria-label="Call ${escapeHtml(fullName(contact))}" title="Call"><i class="bi bi-telephone-fill" aria-hidden="true"></i></a>` : ""}
+                        ${contact.email ? `<a class="quick-action quick-action-email" href="mailto:${encodeURIComponent(contact.email)}" aria-label="Email ${escapeHtml(fullName(contact))}" title="Email"><i class="bi bi-envelope-fill" aria-hidden="true"></i></a>` : ""}
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayTabs(groups){
+            var output = letters.map(function(letter, i){
+                if(groups[letter]){
+                    var target = letter == "#" ? "other" : letter;
+                    return `<a class="tab" style="--i:${i}" href="#letter-${target}" aria-label="Jump to ${letter == "#" ? "other" : letter}">${letter}</a>`;
+                }
+                return `<span class="tab" style="--i:${i}" aria-hidden="true">${letter}</span>`;
+            }).join("");
+
+            var enter = tabsShown ? "" : " tabs-enter";
+            document.getElementById("tabs").innerHTML = `<div class="tabs-inner${enter}">${output}</div>`;
+            tabsShown = true;
+        }
+
+        function addContact(){
+            window.open("add-contact.html", "_self");
+        }
+    </script>
+</body>
+</html>
